@@ -8,5 +8,7 @@ public class JwtOpcoes
     public string ChaveSecreta { get; set; } = string.Empty;
     public string Emissor { get; set; } = string.Empty;
     public string Audiencia { get; set; } = string.Empty;
-    public int ExpiracaoEmMinutos { get; set; } = 60 * 24;
+    /// <summary>Curto de propósito — a sessão longa fica por conta do refresh token (rotativo).</summary>
+    public int ExpiracaoEmMinutos { get; set; } = 60;
+    public int RefreshTokenDuracaoEmDias { get; set; } = 30;
 }

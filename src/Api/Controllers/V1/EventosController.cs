@@ -113,4 +113,13 @@ public class EventosController : ControllerBase
         await _servicoEventos.RemoverAsync(id, ct);
         return NoContent();
     }
+
+    /// <summary>Abre ou fecha as inscrições de um evento. Requer papel Admin.</summary>
+    [HttpPatch("{id:guid}/inscricoes-abertas")]
+    [Authorize(Policy = "Admin")]
+    [ProducesResponseType(typeof(EventoResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<EventoResponse>> AtualizarInscricoesAbertas(Guid id, AtualizarInscricoesAbertasRequest requisicao, CancellationToken ct)
+    {
+        return Ok(await _servicoEventos.AtualizarInscricoesAbertasAsync(id, requisicao.Abertas, ct));
+    }
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using VeiCards.Infraestrutura.Persistencia;
@@ -11,9 +12,11 @@ using VeiCards.Infraestrutura.Persistencia;
 namespace VeiCards.Infraestrutura.Persistencia.Migracoes
 {
     [DbContext(typeof(VeiCardsDbContext))]
-    partial class VeiCardsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260725011314_RefinamentoPermissoesEColecao")]
+    partial class RefinamentoPermissoesEColecao
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

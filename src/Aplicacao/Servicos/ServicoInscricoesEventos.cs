@@ -29,6 +29,11 @@ public class ServicoInscricoesEventos
             return new InscricaoEventoResponse(jaInscrito.EventoId, jaInscrito.UsuarioId, jaInscrito.DataInscricao);
         }
 
+        if (!evento.InscricoesAbertas)
+        {
+            throw new ExcecaoDeRegraDeNegocio("As inscrições para este evento estão fechadas.");
+        }
+
         if (evento.Capacidade is { } capacidade)
         {
             var vagasOcupadas = await _repositorioInscricoes.ContarPorEventoAsync(eventoId, ct);

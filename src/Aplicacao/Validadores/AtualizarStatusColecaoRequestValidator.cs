@@ -3,9 +3,9 @@ using VeiCards.Aplicacao.Dtos;
 
 namespace VeiCards.Aplicacao.Validadores;
 
-public class CriarOuAtualizarCartaRequestValidator : AbstractValidator<CriarOuAtualizarCartaRequest>
+public class AtualizarStatusColecaoRequestValidator : AbstractValidator<AtualizarStatusColecaoRequest>
 {
-    public CriarOuAtualizarCartaRequestValidator()
+    public AtualizarStatusColecaoRequestValidator()
     {
         RuleFor(r => r.Nome).NotEmpty().MaximumLength(200);
         RuleFor(r => r.ImagemUrl).Must(SerUrlValidaOuVazia).WithMessage("URL de imagem inválida.");

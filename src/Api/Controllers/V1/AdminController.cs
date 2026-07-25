@@ -34,4 +34,20 @@ public class AdminController : ControllerBase
     {
         return Ok(await _servico.ListarUsuariosAsync(paginacao.Pagina, paginacao.TamanhoPagina, ct));
     }
+
+    /// <summary>Promove um usuário a administrador.</summary>
+    [HttpPut("usuarios/{id:guid}/promover")]
+    [ProducesResponseType(typeof(UsuarioResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsuarioResponse>> Promover(Guid id, CancellationToken ct)
+    {
+        return Ok(await _servico.PromoverAsync(id, ct));
+    }
+
+    /// <summary>Rebaixa um administrador a usuário comum.</summary>
+    [HttpPut("usuarios/{id:guid}/rebaixar")]
+    [ProducesResponseType(typeof(UsuarioResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsuarioResponse>> Rebaixar(Guid id, CancellationToken ct)
+    {
+        return Ok(await _servico.RebaixarAsync(id, ct));
+    }
 }

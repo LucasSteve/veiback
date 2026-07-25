@@ -1,48 +1,56 @@
 using VeiCards.Aplicacao.Dtos;
 using VeiCards.Aplicacao.Portas.Repositorios;
 using VeiCards.Dominio.Entidades;
-using VeiCards.Dominio.Excecoes;
+using VeiCards.Dominio.Enums;
 
 namespace VeiCards.Aplicacao.Servicos;
 
 /// <summary>
-/// Casos de uso da coleção pessoal do usuário (Tenho/Quero/Favorito por carta) —
-/// equivalente server-side do collectionStore do frontend.
+/// Casos de uso da coleção pessoal do usuário (Tenho/Quero/Favorito por carta, agrupadas
+/// por jogo) — equivalente server-side do collectionStore que hoje vive só no localStorage
+/// do frontend. Genérico por design: não conhece nenhuma regra específica de Pokémon,
+/// Magic, etc. — só o enum TipoJogo distingue um jogo do outro.
 /// </summary>
 public class ServicoColecaoUsuario
 {
-    private readonly IRepositorioStatusCartaUsuario _repositorioStatus;
-    private readonly IRepositorioCartas _repositorioCartas;
+    private readonly IRepositorioCartaColecionada _repositorio;
 
-    public ServicoColecaoUsuario(IRepositorioStatusCartaUsuario repositorioStatus, IRepositorioCartas repositorioCartas)
+    public ServicoColecaoUsuario(IRepositorioCartaColecionada repositorio)
     {
-        _repositorioStatus = repositorioStatus;
-        _repositorioCartas = repositorioCartas;
+        _repositorio = repositorio;
     }
 
-    public async Task<IReadOnlyList<StatusCartaResponse>> ObterStatusDoUsuarioAsync(Guid usuarioId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<JogoComContagemResponse>> ListarJogosAsync(Guid usuarioId, CancellationToken ct = default)
     {
-        var status = await _repositorioStatus.ListarPorUsuarioAsync(usuarioId, ct);
-        return status.Select(s => new StatusCartaResponse(s.CartaId, s.Tem, s.Quero, s.Favorito)).ToList();
+        var jogos = await _repositorio.ListarJogosComContagemAsync(usuarioId, ct);
+        return jogos.Select(j => new JogoComContagemResponse(j.Jogo.ToString(), j.Quantidade)).ToList();
     }
 
-    public async Task<StatusCartaResponse> AtualizarStatusAsync(Guid usuarioId, Guid cartaId, AtualizarStatusCartaRequest requisicao, CancellationToken ct = default)
+    public async Task<ResultadoPaginado<CartaColecionadaResponse>> ListarPorJogoAsync(Guid usuarioId, TipoJogo jogo, int pagina, int tamanhoPagina, CancellationToken ct = default)
     {
-        _ = await _repositorioCartas.ObterPorIdAsync(cartaId, ct) ?? throw new ExcecaoDeEntidadeNaoEncontrada(nameof(Carta), cartaId);
+        var (itens, total) = await _repositorio.ListarAsync(usuarioId, jogo, pagina, tamanhoPagina, ct);
+        return new ResultadoPaginado<CartaColecionadaResponse>(itens.Select(MapearParaResponse).ToList(), pagina, tamanhoPagina, total);
+    }
 
-        var status = await _repositorioStatus.ObterAsync(usuarioId, cartaId, ct);
-        if (status is null)
+    public async Task<CartaColecionadaResponse> AtualizarStatusAsync(Guid usuarioId, TipoJogo jogo, string cartaExternaId, AtualizarStatusColecaoRequest requisicao, CancellationToken ct = default)
+    {
+        var carta = await _repositorio.ObterAsync(usuarioId, jogo, cartaExternaId, ct);
+
+        if (carta is null)
         {
-            status = StatusCartaUsuario.Criar(usuarioId, cartaId);
-            status.AtualizarStatus(requisicao.Tem, requisicao.Quero, requisicao.Favorito);
-            await _repositorioStatus.AdicionarAsync(status, ct);
+            carta = CartaColecionada.Criar(usuarioId, jogo, cartaExternaId, requisicao.Nome, requisicao.Numero, requisicao.Raridade, requisicao.ImagemUrl);
+            carta.AtualizarStatus(requisicao.Tem, requisicao.Quero, requisicao.Favorito, requisicao.Nome, requisicao.Numero, requisicao.Raridade, requisicao.ImagemUrl);
+            await _repositorio.AdicionarAsync(carta, ct);
         }
         else
         {
-            status.AtualizarStatus(requisicao.Tem, requisicao.Quero, requisicao.Favorito);
-            await _repositorioStatus.AtualizarAsync(status, ct);
+            carta.AtualizarStatus(requisicao.Tem, requisicao.Quero, requisicao.Favorito, requisicao.Nome, requisicao.Numero, requisicao.Raridade, requisicao.ImagemUrl);
+            await _repositorio.AtualizarAsync(carta, ct);
         }
 
-        return new StatusCartaResponse(status.CartaId, status.Tem, status.Quero, status.Favorito);
+        return MapearParaResponse(carta);
     }
+
+    private static CartaColecionadaResponse MapearParaResponse(CartaColecionada carta) => new(
+        carta.Id, carta.Jogo.ToString(), carta.CartaExternaId, carta.Nome, carta.Numero, carta.Raridade, carta.ImagemUrl, carta.Tem, carta.Quero, carta.Favorito);
 }

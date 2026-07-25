@@ -17,6 +17,7 @@ public class Evento : EntidadeBase
     public TipoEvento Tipo { get; private set; }
     public int? Capacidade { get; private set; }
     public string? ImagemUrl { get; private set; }
+    public bool InscricoesAbertas { get; private set; }
 
     private Evento()
     {
@@ -35,6 +36,7 @@ public class Evento : EntidadeBase
         Tipo = tipo;
         Capacidade = capacidade;
         ImagemUrl = imagemUrl;
+        InscricoesAbertas = true;
     }
 
     public static Evento Criar(string nome, string? descricao, DateTime data, string? horario, string? local, string? cidade, string? organizador, string? formato, TipoEvento tipo, int? capacidade, string? imagemUrl)
@@ -76,6 +78,10 @@ public class Evento : EntidadeBase
         Capacidade = capacidade;
         ImagemUrl = imagemUrl;
     }
+
+    public void AbrirInscricoes() => InscricoesAbertas = true;
+
+    public void FecharInscricoes() => InscricoesAbertas = false;
 
     /// <summary>
     /// Status é calculado a partir de Data/Horário em relação a "agora", nunca persistido —

@@ -19,7 +19,6 @@ public static class InjecaoDependenciaApi
     public static IServiceCollection AdicionarServicosDaAplicacao(this IServiceCollection servicos)
     {
         servicos.AddScoped<ServicoAutenticacao>();
-        servicos.AddScoped<ServicoCartas>();
         servicos.AddScoped<ServicoColecaoUsuario>();
         servicos.AddScoped<ServicoNoticias>();
         servicos.AddScoped<ServicoEventos>();

@@ -23,11 +23,11 @@ public static class InjecaoDependenciaInfraestrutura
         servicos.Configure<JwtOpcoes>(configuracao.GetSection(JwtOpcoes.Secao));
 
         servicos.AddScoped<IRepositorioUsuarios, RepositorioUsuarios>();
-        servicos.AddScoped<IRepositorioCartas, RepositorioCartas>();
-        servicos.AddScoped<IRepositorioStatusCartaUsuario, RepositorioStatusCartaUsuario>();
+        servicos.AddScoped<IRepositorioCartaColecionada, RepositorioCartaColecionada>();
         servicos.AddScoped<IRepositorioNoticias, RepositorioNoticias>();
         servicos.AddScoped<IRepositorioEventos, RepositorioEventos>();
         servicos.AddScoped<IRepositorioInscricoesEventos, RepositorioInscricoesEventos>();
+        servicos.AddScoped<IRepositorioRefreshTokens, RepositorioRefreshTokens>();
 
         servicos.AddScoped<IServicoSenha, ServicoSenhaBCrypt>();
         servicos.AddScoped<IServicoToken, ServicoTokenJwt>();

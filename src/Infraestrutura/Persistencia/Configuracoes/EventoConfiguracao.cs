@@ -24,6 +24,7 @@ public class EventoConfiguracao : IEntityTypeConfiguration<Evento>
         builder.Property(e => e.Tipo).HasColumnName("tipo").HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(e => e.Capacidade).HasColumnName("capacidade");
         builder.Property(e => e.ImagemUrl).HasColumnName("imagem_url").HasMaxLength(500);
+        builder.Property(e => e.InscricoesAbertas).HasColumnName("inscricoes_abertas").IsRequired();
 
         builder.HasIndex(e => e.Cidade);
         builder.HasIndex(e => e.Tipo);

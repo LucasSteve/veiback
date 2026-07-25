@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -18,7 +19,9 @@ public class ServicoTokenJwt : IServicoToken
         _opcoes = opcoes.Value;
     }
 
-    public string GerarToken(Usuario usuario)
+    public TimeSpan DuracaoRefreshToken => TimeSpan.FromDays(_opcoes.RefreshTokenDuracaoEmDias);
+
+    public (string Token, DateTime ExpiraEm) GerarTokenDeAcesso(Usuario usuario)
     {
         var claims = new[]
         {
@@ -30,14 +33,23 @@ public class ServicoTokenJwt : IServicoToken
 
         var chave = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opcoes.ChaveSecreta));
         var credenciais = new SigningCredentials(chave, SecurityAlgorithms.HmacSha256);
+        var expiraEm = DateTime.UtcNow.AddMinutes(_opcoes.ExpiracaoEmMinutos);
 
         var token = new JwtSecurityToken(
             issuer: _opcoes.Emissor,
             audience: _opcoes.Audiencia,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_opcoes.ExpiracaoEmMinutos),
+            expires: expiraEm,
             signingCredentials: credenciais);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiraEm);
+    }
+
+    public string GerarRefreshTokenBruto() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+
+    public string CalcularHashRefreshToken(string tokenBruto)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(tokenBruto));
+        return Convert.ToHexString(bytes);
     }
 }

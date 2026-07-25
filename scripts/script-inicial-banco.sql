@@ -218,3 +218,102 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    DROP TABLE status_cartas_usuario;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    DROP TABLE cartas;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    ALTER TABLE eventos ADD inscricoes_abertas boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    CREATE TABLE cartas_colecionadas (
+        id uuid NOT NULL,
+        usuario_id uuid NOT NULL,
+        jogo character varying(30) NOT NULL,
+        carta_externa_id character varying(100) NOT NULL,
+        nome character varying(200) NOT NULL,
+        numero character varying(20),
+        raridade character varying(50),
+        imagem_url character varying(500),
+        tem boolean NOT NULL,
+        quero boolean NOT NULL,
+        favorito boolean NOT NULL,
+        criado_em timestamp with time zone NOT NULL,
+        atualizado_em timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_cartas_colecionadas" PRIMARY KEY (id),
+        CONSTRAINT "FK_cartas_colecionadas_usuarios_usuario_id" FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    CREATE TABLE refresh_tokens (
+        id uuid NOT NULL,
+        usuario_id uuid NOT NULL,
+        token_hash character varying(200) NOT NULL,
+        criado_em timestamp with time zone NOT NULL,
+        expira_em timestamp with time zone NOT NULL,
+        revogado_em timestamp with time zone,
+        CONSTRAINT "PK_refresh_tokens" PRIMARY KEY (id),
+        CONSTRAINT "FK_refresh_tokens_usuarios_usuario_id" FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    CREATE INDEX "IX_cartas_colecionadas_usuario_id_jogo" ON cartas_colecionadas (usuario_id, jogo);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    CREATE UNIQUE INDEX "IX_cartas_colecionadas_usuario_id_jogo_carta_externa_id" ON cartas_colecionadas (usuario_id, jogo, carta_externa_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    CREATE UNIQUE INDEX "IX_refresh_tokens_token_hash" ON refresh_tokens (token_hash);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    CREATE INDEX "IX_refresh_tokens_usuario_id" ON refresh_tokens (usuario_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260725011314_RefinamentoPermissoesEColecao') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260725011314_RefinamentoPermissoesEColecao', '10.0.10');
+    END IF;
+END $EF$;
+COMMIT;
+

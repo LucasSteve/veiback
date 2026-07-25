@@ -72,6 +72,22 @@ public class ServicoInscricoesEventosTestes
     }
 
     [Fact]
+    public async Task InscreverAsync_ComInscricoesFechadas_DeveLancarExcecaoDeRegraDeNegocio()
+    {
+        var evento = CriarEventoComCapacidade(64);
+        evento.FecharInscricoes();
+        var usuarioId = Guid.NewGuid();
+
+        _repositorioEventos.Setup(r => r.ObterPorIdAsync(evento.Id, It.IsAny<CancellationToken>())).ReturnsAsync(evento);
+        _repositorioInscricoes.Setup(r => r.ObterAsync(evento.Id, usuarioId, It.IsAny<CancellationToken>())).ReturnsAsync((InscricaoEvento?)null);
+
+        var acao = () => _servico.InscreverAsync(evento.Id, usuarioId, CancellationToken.None);
+
+        await acao.Should().ThrowAsync<ExcecaoDeRegraDeNegocio>();
+        _repositorioInscricoes.Verify(r => r.AdicionarAsync(It.IsAny<InscricaoEvento>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task InscreverAsync_ComEventoInexistente_DeveLancarExcecaoDeEntidadeNaoEncontrada()
     {
         var eventoId = Guid.NewGuid();

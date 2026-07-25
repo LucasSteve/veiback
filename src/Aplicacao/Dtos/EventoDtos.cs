@@ -14,7 +14,8 @@ public record EventoResponse(
     string Status,
     int? Capacidade,
     int VagasOcupadas,
-    string? ImagemUrl);
+    string? ImagemUrl,
+    bool InscricoesAbertas);
 
 public record CriarOuAtualizarEventoRequest(
     string Nome,
@@ -28,5 +29,7 @@ public record CriarOuAtualizarEventoRequest(
     string Tipo,
     int? Capacidade,
     string? ImagemUrl);
+
+public record AtualizarInscricoesAbertasRequest(bool Abertas);
 
 public record InscricaoEventoResponse(Guid EventoId, Guid UsuarioId, DateTime DataInscricao);

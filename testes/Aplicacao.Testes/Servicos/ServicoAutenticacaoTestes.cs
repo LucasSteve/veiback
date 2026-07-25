@@ -13,13 +13,18 @@ namespace VeiCards.Aplicacao.Testes.Servicos;
 public class ServicoAutenticacaoTestes
 {
     private readonly Mock<IRepositorioUsuarios> _repositorio = new();
+    private readonly Mock<IRepositorioRefreshTokens> _repositorioRefreshTokens = new();
     private readonly Mock<IServicoSenha> _servicoSenha = new();
     private readonly Mock<IServicoToken> _servicoToken = new();
     private readonly ServicoAutenticacao _servico;
 
     public ServicoAutenticacaoTestes()
     {
-        _servico = new ServicoAutenticacao(_repositorio.Object, _servicoSenha.Object, _servicoToken.Object);
+        _servicoToken.Setup(t => t.DuracaoRefreshToken).Returns(TimeSpan.FromDays(30));
+        _servicoToken.Setup(t => t.GerarRefreshTokenBruto()).Returns("refresh-bruto-fake");
+        _servicoToken.Setup(t => t.CalcularHashRefreshToken(It.IsAny<string>())).Returns("refresh-hash-fake");
+
+        _servico = new ServicoAutenticacao(_repositorio.Object, _repositorioRefreshTokens.Object, _servicoSenha.Object, _servicoToken.Object);
     }
 
     [Fact]
@@ -37,20 +42,22 @@ public class ServicoAutenticacaoTestes
     }
 
     [Fact]
-    public async Task RegistrarAsync_ComDadosValidos_DeveGerarHashEPersistirUsuario()
+    public async Task RegistrarAsync_ComDadosValidos_DeveGerarHashEPersistirUsuarioEEmitirRefreshToken()
     {
         _repositorio.Setup(r => r.ExisteComNomeUsuarioOuEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
         _servicoSenha.Setup(s => s.GerarHash("senha123")).Returns("hash-gerado");
-        _servicoToken.Setup(t => t.GerarToken(It.IsAny<Usuario>())).Returns("token-jwt-fake");
+        _servicoToken.Setup(t => t.GerarTokenDeAcesso(It.IsAny<Usuario>())).Returns(("token-jwt-fake", DateTime.UtcNow.AddHours(1)));
 
         var requisicao = new RegistrarUsuarioRequest("joao", "joao@teste.com", "João", "senha123");
 
         var resultado = await _servico.RegistrarAsync(requisicao, CancellationToken.None);
 
         resultado.Token.Should().Be("token-jwt-fake");
+        resultado.RefreshToken.Should().Be("refresh-bruto-fake");
         resultado.Usuario.NomeUsuario.Should().Be("joao");
         _repositorio.Verify(r => r.AdicionarAsync(It.Is<Usuario>(u => u.SenhaHash == "hash-gerado"), It.IsAny<CancellationToken>()), Times.Once);
+        _repositorioRefreshTokens.Verify(r => r.AdicionarAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -81,10 +88,37 @@ public class ServicoAutenticacaoTestes
         var usuario = Usuario.Registrar("joao", "joao@teste.com", "João", "hash-armazenado");
         _repositorio.Setup(r => r.ObterPorNomeUsuarioAsync("joao", It.IsAny<CancellationToken>())).ReturnsAsync(usuario);
         _servicoSenha.Setup(s => s.VerificarHash("senha123", "hash-armazenado")).Returns(true);
-        _servicoToken.Setup(t => t.GerarToken(usuario)).Returns("token-jwt-fake");
+        _servicoToken.Setup(t => t.GerarTokenDeAcesso(usuario)).Returns(("token-jwt-fake", DateTime.UtcNow.AddHours(1)));
 
         var resultado = await _servico.LoginAsync(new LoginRequest("joao", "senha123"), CancellationToken.None);
 
         resultado.Token.Should().Be("token-jwt-fake");
+    }
+
+    [Fact]
+    public async Task RenovarSessaoAsync_ComTokenInvalido_DeveLancarExcecaoDeRegraDeNegocio()
+    {
+        _repositorioRefreshTokens.Setup(r => r.ObterPorHashAsync("refresh-hash-fake", It.IsAny<CancellationToken>())).ReturnsAsync((RefreshToken?)null);
+
+        var acao = () => _servico.RenovarSessaoAsync(new RefreshTokenRequest("token-bruto"), CancellationToken.None);
+
+        await acao.Should().ThrowAsync<ExcecaoDeRegraDeNegocio>();
+    }
+
+    [Fact]
+    public async Task RenovarSessaoAsync_ComTokenValido_DeveRevogarOAntigoEEmitirNovoPar()
+    {
+        var usuario = Usuario.Registrar("joao", "joao@teste.com", "João", "hash-armazenado");
+        var tokenAntigo = RefreshToken.Criar(usuario.Id, "refresh-hash-fake", DateTime.UtcNow.AddDays(10));
+
+        _repositorioRefreshTokens.Setup(r => r.ObterPorHashAsync("refresh-hash-fake", It.IsAny<CancellationToken>())).ReturnsAsync(tokenAntigo);
+        _repositorio.Setup(r => r.ObterPorIdAsync(usuario.Id, It.IsAny<CancellationToken>())).ReturnsAsync(usuario);
+        _servicoToken.Setup(t => t.GerarTokenDeAcesso(usuario)).Returns(("novo-token", DateTime.UtcNow.AddHours(1)));
+
+        var resultado = await _servico.RenovarSessaoAsync(new RefreshTokenRequest("token-bruto"), CancellationToken.None);
+
+        resultado.Token.Should().Be("novo-token");
+        tokenAntigo.EstaAtivo.Should().BeFalse();
+        _repositorioRefreshTokens.Verify(r => r.AtualizarAsync(tokenAntigo, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

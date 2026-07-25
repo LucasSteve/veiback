@@ -59,6 +59,23 @@ public class ServicoEventos
         await _repositorio.RemoverAsync(evento, ct);
     }
 
+    public async Task<EventoResponse> AtualizarInscricoesAbertasAsync(Guid id, bool abertas, CancellationToken ct = default)
+    {
+        var evento = await _repositorio.ObterPorIdAsync(id, ct) ?? throw new ExcecaoDeEntidadeNaoEncontrada(nameof(Evento), id);
+
+        if (abertas)
+        {
+            evento.AbrirInscricoes();
+        }
+        else
+        {
+            evento.FecharInscricoes();
+        }
+
+        await _repositorio.AtualizarAsync(evento, ct);
+        return await MapearParaResponseAsync(evento, ct);
+    }
+
     private async Task<EventoResponse> MapearParaResponseAsync(Evento evento, CancellationToken ct)
     {
         var vagasOcupadas = await _repositorioInscricoes.ContarPorEventoAsync(evento.Id, ct);
@@ -76,6 +93,7 @@ public class ServicoEventos
             evento.CalcularStatus(DateTime.UtcNow).ToString(),
             evento.Capacidade,
             vagasOcupadas,
-            evento.ImagemUrl);
+            evento.ImagemUrl,
+            evento.InscricoesAbertas);
     }
 }

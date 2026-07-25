@@ -10,11 +10,11 @@ public class VeiCardsDbContext : DbContext
     }
 
     public DbSet<Usuario> Usuarios => Set<Usuario>();
-    public DbSet<Carta> Cartas => Set<Carta>();
-    public DbSet<StatusCartaUsuario> StatusCartasUsuario => Set<StatusCartaUsuario>();
+    public DbSet<CartaColecionada> CartasColecionadas => Set<CartaColecionada>();
     public DbSet<Noticia> Noticias => Set<Noticia>();
     public DbSet<Evento> Eventos => Set<Evento>();
     public DbSet<InscricaoEvento> InscricoesEventos => Set<InscricaoEvento>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

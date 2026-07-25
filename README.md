@@ -1,17 +1,14 @@
 # VEI Cards — Backend
 
 API REST em .NET 10 / ASP.NET Core para a plataforma VEI Cards, construída em Arquitetura
-Hexagonal (Ports & Adapters). Este backend é **completamente independente** do frontend
-(`../src`) — nenhum arquivo do frontend foi alterado. A integração acontece apenas via HTTP,
-documentada na seção [Endpoints](#endpoints).
+Hexagonal (Ports & Adapters). Vive em repositório próprio, separado do frontend — a
+integração acontece só via HTTP.
 
-## ⚠️ Sobre a connection string
+## ⚠️ Sobre segredos
 
-A connection string do Supabase compartilhada na conversa **não foi commitada em nenhum
-arquivo** — ela contém a senha do banco em texto puro. `appsettings.json` traz os campos
-`ConnectionStrings:VeiCardsDb` e `Jwt:ChaveSecreta` vazios de propósito; forneça os valores
-reais via variável de ambiente ou `dotnet user-secrets` (ver abaixo). **Recomendo fortemente
-rotacionar a senha do Supabase**, já que ela foi exposta em texto puro nesta conversa.
+`appsettings.json` traz `ConnectionStrings:VeiCardsDb` e `Jwt:ChaveSecreta` vazios de
+propósito — nunca commite valores reais nesses campos. Forneça-os via variável de ambiente,
+`dotnet user-secrets` ou o arquivo `.env` (gitignored) usado pelo Docker Compose.
 
 ## Arquitetura
 
@@ -20,7 +17,7 @@ backend/
 ├── src/
 │   ├── Dominio/          Entidades, enums e regras de negócio puras. Zero dependências.
 │   ├── Aplicacao/        Casos de uso, DTOs, portas (interfaces) e validadores FluentValidation.
-│   ├── Infraestrutura/   EF Core (DbContext, Configurations, Migrations), repositórios, JWT, BCrypt.
+│   ├── Infraestrutura/   EF Core (DbContext, Configurations, Migrations), repositórios, JWT, BCrypt, seed inicial.
 │   └── Api/               Controllers, middlewares, Program.cs, appsettings.
 └── testes/
     ├── Dominio.Testes/         Testes unitários de entidades/regras de negócio.
@@ -28,12 +25,26 @@ backend/
     └── Infraestrutura.Testes/  Testes de integração (WebApplicationFactory) dos principais endpoints.
 ```
 
-As interfaces de repositório (portas) ficam em `Aplicacao/Portas`, não em `Dominio` — é a
-Aplicação quem declara o que precisa do mundo externo; o Domínio permanece 100% livre de
-qualquer dependência de infraestrutura. Não existe Unit of Work separado: o próprio
-`DbContext` do EF Core já cumpre esse papel (cada método de repositório que muda estado
-chama `SaveChangesAsync`). Um repositório por agregado, sem abstração genérica — decisões
-detalhadas na conversa que precedeu a implementação.
+Interfaces de repositório (portas) ficam em `Aplicacao/Portas` — a Aplicação declara o que
+precisa do mundo externo; o Domínio permanece livre de infraestrutura. Sem Unit of Work
+separado: o `DbContext` já cumpre esse papel. Um repositório por agregado, sem abstração
+genérica.
+
+## Controle de acesso (Roles)
+
+Dois papéis: `Usuario` (padrão) e `Admin`. Endpoints administrativos exigem
+`[Authorize(Policy = "Admin")]` — usuários comuns recebem 403. Um administrador consegue
+promover/rebaixar outros usuários via `/admin/usuarios/{id}/promover` e `/rebaixar`.
+
+### Usuário admin inicial (seed)
+
+Na primeira execução, a API cria automaticamente (se ainda não existir) um usuário:
+
+- **Usuário**: `admin`
+- **Senha**: `Abc#123`
+
+A verificação é idempotente (por `nomeUsuario`) — rodar a API várias vezes não duplica nem
+recria o admin. Senha armazenada com hash BCrypt, como qualquer outro usuário.
 
 ## Como rodar
 
@@ -45,20 +56,19 @@ cp .env.example .env
 docker compose up --build
 ```
 
-API disponível em `http://localhost:8080`, Swagger em `http://localhost:8080/swagger` (ambiente Development).
+API em `http://localhost:8080`, Swagger em `http://localhost:8080/swagger` (ambiente Development).
 
 ### Opção 2 — Local com .NET SDK
 
 ```bash
-# defina a connection string e o segredo JWT (não vão para appsettings.json)
 export ConnectionStrings__VeiCardsDb="Host=localhost;Port=5432;Database=veicards;Username=postgres;Password=postgres"
 export Jwt__ChaveSecreta="uma-chave-bem-grande-e-aleatoria"
 
-dotnet ef database update --project src/Infraestrutura --startup-project src/Infraestrutura
 dotnet run --project src/Api
 ```
 
-Ou, em desenvolvimento, use `dotnet user-secrets` dentro de `src/Api` em vez de variáveis de ambiente.
+Migrations e o seed do admin rodam automaticamente no startup (`Program.cs`) — não é
+necessário nenhum passo manual além de configurar a connection string.
 
 ### Testes
 
@@ -66,70 +76,102 @@ Ou, em desenvolvimento, use `dotnet user-secrets` dentro de `src/Api` em vez de 
 dotnet test
 ```
 
-29 testes (13 domínio, 10 aplicação, 6 integração) — os testes de integração usam o
-provider InMemory do EF Core, não exigem PostgreSQL rodando.
+42 testes (domínio, aplicação com Moq, integração via `WebApplicationFactory` + EF Core InMemory).
 
 ### Migrations
-
-A migration inicial já está gerada em `src/Infraestrutura/Persistencia/Migracoes/`, e o
-script SQL equivalente em `scripts/script-inicial-banco.sql`. Para gerar uma nova migration:
 
 ```bash
 dotnet ef migrations add NomeDaMigracao --project src/Infraestrutura --startup-project src/Infraestrutura --output-dir Persistencia/Migracoes
 ```
+
+O script SQL consolidado das migrations vigentes está em `scripts/script-inicial-banco.sql`.
 
 ## Modelo de dados
 
 | Tabela | Descrição |
 |---|---|
 | `usuarios` | Conta de usuário (username/email únicos, senha com hash BCrypt, papel Usuario/Admin) |
-| `cartas` | Catálogo interno de cartas (independente da integração TCGdex do frontend) |
-| `status_cartas_usuario` | Tenho/Quero/Favorito por usuário+carta (único por par) |
+| `cartas_colecionadas` | Cartas salvas na coleção pessoal de cada usuário — **snapshot completo** (nome, número, raridade, imagem), não uma referência a um catálogo. Genérico por jogo (enum `TipoJogo`), sem código específico de nenhum TCG |
+| `refresh_tokens` | Sessões de longa duração, com rotação (cada uso revoga o token e emite um novo) |
 | `noticias` | Notícias, com autor referenciando `usuarios` |
-| `eventos` | Eventos (torneio/liga/prerelease/campeonato/encontro) — status é **calculado**, não armazenado |
+| `eventos` | Eventos (torneio/liga/prerelease/campeonato/encontro). `status` é **calculado** a partir da data (nunca fica desatualizado); `inscricoes_abertas` controla se o botão de inscrição aparece no frontend |
 | `inscricoes_eventos` | Inscrição de um usuário em um evento (único por par) |
+
+A coleção foi desenhada para crescer sem alterações estruturais: adicionar um jogo novo é
+só adicionar um valor ao enum `TipoJogo` — nenhuma tabela ou código específico por jogo.
 
 ## Endpoints
 
-Base: `/api/v1`. Autenticação via `Authorization: Bearer {token}`. Documentação interativa completa em `/swagger`.
+Base: `/api/v1`. Autenticação via `Authorization: Bearer {token}`. Documentação interativa
+completa (com botão **Authorize** para JWT) em `/swagger`.
 
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| POST | `/auth/registrar` | — | Cria conta e retorna token |
-| POST | `/auth/login` | — | Autentica e retorna token |
-| GET | `/auth/me` | usuário | Perfil autenticado |
-| PUT | `/auth/me` | usuário | Atualiza nome/email |
-| GET | `/cartas` | — | Lista cartas (paginação, filtros `busca`/`jogo`/`raridade`, `ordenarPor`) |
-| GET | `/cartas/{id}` | — | Detalhe de uma carta |
-| GET | `/cartas/status` | usuário | Status de coleção do usuário para todas as cartas |
-| PUT | `/cartas/{id}/status` | usuário | Atualiza Tenho/Quero/Favorito |
-| POST/PUT/DELETE | `/cartas...` | admin | CRUD do catálogo |
+| POST | `/autenticacao/registrar` | — | Cria conta, retorna token + refreshToken |
+| POST | `/autenticacao/login` | — | Autentica, retorna token + refreshToken |
+| POST | `/autenticacao/refresh` | — | Troca um refresh token válido por um par novo (rotação) |
+| GET | `/autenticacao/me` | usuário | Perfil autenticado |
+| PUT | `/autenticacao/me` | usuário | Atualiza nome/email |
+| GET | `/colecao/jogos` | usuário | Jogos com pelo menos 1 carta colecionada, com contagem |
+| GET | `/colecao/{jogo}` | usuário | Cartas colecionadas de um jogo (paginado) |
+| PUT | `/colecao/{jogo}/{cartaExternaId}` | usuário | Upsert de Tenho/Quero/Favorito (grava o snapshot) |
 | GET | `/noticias` | — | Lista notícias (paginação, filtro `categoria`) |
 | GET | `/noticias/{id}` | — | Notícia completa |
 | POST/PUT/DELETE | `/noticias...` | admin | CRUD de notícias |
 | GET | `/eventos` | — | Lista eventos (paginação, filtros `cidade`/`tipo`/`status`) |
 | GET | `/eventos/{id}` | — | Detalhe do evento |
-| POST | `/eventos/{id}/inscricao` | usuário | Inscreve-se (idempotente, respeita capacidade) |
+| POST | `/eventos/{id}/inscricao` | usuário | Inscreve-se (idempotente, respeita capacidade e `inscricoesAbertas`) |
 | DELETE | `/eventos/{id}/inscricao` | usuário | Cancela inscrição |
 | GET | `/eventos/minhas-inscricoes` | usuário | Inscrições do usuário autenticado |
 | POST/PUT/DELETE | `/eventos...` | admin | CRUD de eventos |
-| GET | `/admin/estatisticas` | admin | Contagens gerais (espelha o AdminPanel do frontend) |
+| PATCH | `/eventos/{id}/inscricoes-abertas` | admin | Abre/fecha inscrições do evento |
+| GET | `/admin/estatisticas` | admin | Contagens gerais (usuários, cartas colecionadas, notícias, eventos) |
 | GET | `/admin/usuarios` | admin | Lista usuários |
-| GET | `/health` | — | Health check (verifica conectividade com PostgreSQL) |
+| PUT | `/admin/usuarios/{id}/promover` | admin | Promove usuário a admin |
+| PUT | `/admin/usuarios/{id}/rebaixar` | admin | Rebaixa admin a usuário comum |
+| GET | `/health` | — | Health check (fora do prefixo `/api/v1`) |
 
-## Integração com o frontend (apenas documentação — nenhum código do frontend foi alterado)
+## Testando pelo Swagger
 
-O frontend hoje usa dados mockados (`src/services/mockApi.ts` / `src/mocks/*`) com o mesmo
-formato conceitual das entidades acima. Para integrar de verdade, bastaria trocar
-`src/services/api.ts` (já existe, já é usado quando `VITE_USE_MOCK_API=false` e
-`VITE_API_BASE_URL` aponta para este backend) para bater nas rotas desta API — nenhuma
-mudança estrutural seria necessária no frontend além de mapear os nomes de campo
-(a maioria já bate: `id`, `name`→`Nome`, etc. exigiriam um pequeno adaptador de shape).
+1. `dotnet run --project src/Api` (ou `docker compose up`).
+2. Abra `http://localhost:8080/swagger`.
+3. Rode `POST /autenticacao/login` com `{"nomeUsuario":"admin","senha":"Abc#123"}`.
+4. Copie o campo `token` da resposta.
+5. Clique em **Authorize** (canto superior direito), cole `Bearer {token}`.
+6. Todos os endpoints protegidos ficam testáveis diretamente na página.
+
+## Testando pelo Postman
+
+Arquivos em `postman/`:
+
+- `VeiCards.postman_collection.json` — todos os endpoints, organizados em pastas (Autenticação, Coleção, Eventos, Notícias, Administração, Infra).
+- `VeiCards.postman_environment.json` — variáveis `baseUrl`, `token`, `refreshToken`, `usuarioAdmin`, `senhaAdmin`, etc.
+
+Importe os dois no Postman, selecione o Environment "VEI Cards - Local", rode **Autenticação
+→ Login (admin)** — o token é salvo automaticamente em `{{token}}` (via script de teste) e
+reutilizado por todo o resto da collection sem nenhuma configuração adicional. O mesmo vale
+para `{{refreshToken}}`, `{{eventoId}}`, `{{noticiaId}}` e `{{usuarioId}}`, preenchidos
+automaticamente pelas requisições que os criam.
+
+Validado de ponta a ponta com Newman (`npx newman run postman/VeiCards.postman_collection.json -e postman/VeiCards.postman_environment.json`) — 27 requisições, 0 falhas.
+
+## Integração com o frontend
+
+O frontend (`VeicardsFront`, repositório separado) já está conectado a esta API via
+`src/services/api.ts` — sem mocks, sem gambiarra. Para apontar o frontend para uma instância
+diferente do backend, defina no `.env.local` dele:
+
+```
+VITE_USE_MOCK_API=false
+VITE_API_BASE_URL=http://localhost:8080/api/v1
+```
 
 ## O que ficou fora do escopo (e por quê)
 
-- **TCGdex**: é uma integração pública de terceiros já resolvida inteiramente no frontend
-  (chamada direta do browser); trazê-la para o backend não tinha justificativa clara nesta
-  fase.
-- **Troca de senha / recuperação de senha**: não existe no frontend atual; não implementado
-  para não expandir escopo sem pedido explícito.
+- **TCGdex, Scryfall, YGOPRODeck etc.**: integrações públicas de terceiros consumidas
+  diretamente pelo frontend (browser) — o backend não faz proxy delas, evita acoplar nossa
+  disponibilidade à de terceiros.
+- **Navegação de cartas para jogos além de Pokémon**: a arquitetura da coleção já suporta
+  qualquer jogo (basta adicionar ao enum `TipoJogo`), mas a navegação client-side via API
+  externa só está implementada para Pokémon por enquanto — os demais jogos aparecem no
+  seletor com aviso "em breve".

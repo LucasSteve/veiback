@@ -74,4 +74,6 @@ public class Usuario : EntidadeBase
     }
 
     public void PromoverParaAdmin() => Papel = PapelUsuario.Admin;
+
+    public void RebaixarParaUsuario() => Papel = PapelUsuario.Usuario;
 }
