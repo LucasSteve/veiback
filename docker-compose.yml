@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: veicards-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: veicards
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - veicards-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: veicards-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__VeiCardsDb: "Host=db;Port=5432;Database=veicards;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres}"
+      Jwt__ChaveSecreta: ${JWT_CHAVE_SECRETA:?defina JWT_CHAVE_SECRETA no arquivo .env}
+      Jwt__Emissor: VeiCards.Api
+      Jwt__Audiencia: VeiCards.Frontend
+      Cors__OrigensPermitidas__0: ${CORS_ORIGEM_FRONTEND:-http://localhost:5173}
+    ports:
+      - "8080:8080"
+
+volumes:
+  veicards-db-data:

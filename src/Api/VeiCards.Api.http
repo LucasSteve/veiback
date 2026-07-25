@@ -1,0 +1,6 @@
+@VeiCards.Api_HostAddress = http://localhost:5090
+
+GET {{VeiCards.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

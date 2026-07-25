@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Api/">
+    <Project Path="src/Api/VeiCards.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Aplicacao/">
+    <Project Path="src/Aplicacao/VeiCards.Aplicacao.csproj" />
+  </Folder>
+  <Folder Name="/src/Dominio/">
+    <Project Path="src/Dominio/VeiCards.Dominio.csproj" />
+  </Folder>
+  <Folder Name="/src/Infraestrutura/">
+    <Project Path="src/Infraestrutura/VeiCards.Infraestrutura.csproj" />
+  </Folder>
+  <Folder Name="/testes/" />
+  <Folder Name="/testes/Aplicacao.Testes/">
+    <Project Path="testes/Aplicacao.Testes/VeiCards.Aplicacao.Testes.csproj" />
+  </Folder>
+  <Folder Name="/testes/Dominio.Testes/">
+    <Project Path="testes/Dominio.Testes/VeiCards.Dominio.Testes.csproj" />
+  </Folder>
+  <Folder Name="/testes/Infraestrutura.Testes/">
+    <Project Path="testes/Infraestrutura.Testes/VeiCards.Infraestrutura.Testes.csproj" />
+  </Folder>
+</Solution>
